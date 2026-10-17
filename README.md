@@ -1,350 +1,603 @@
-# Senkai-Sora
-Senkai Sora is a multilingual anime streaming platform designed to help anime fans discover and access anime in multiple languages, including Japanese, English, Hindi, Telugu, Malayalam, and Bangla, through publicly available third-party sources.
+# 🌌 Senkai Sora — Modern Multilingual Anime Streaming Web App
 
+[![Next.js](https://img.shields.io/badge/Next.js-16.4.0-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.0.0-61dafb?style=flat-square&logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+[![Video.js](https://img.shields.io/badge/Video.js-10.0-ff0055?style=flat-square&logo=video.js)](https://videojs.org/)
 
-#Library
+**Senkai Sora** is a high-performance, responsive anime streaming web application built with Next.js, React, and Video.js 10. It enables seamless discovery and playback of anime in multiple regional languages (Japanese, English, Hindi, Tamil, Telugu, Malayalam, and Bangla) with real-time multi-audio track switching, intro/outro auto-skipping, dynamic stream proxying, and an ad-free glassmorphic user interface.
+
+---
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Architecture Overview](#-architecture-overview)
+- [Getting Started](#-getting-started)
+- [Environment Variables](#-environment-variables)
+- [Developer Endpoints & API Reference](#-developer-endpoints--api-reference)
+  - [1. Homepage & Catalog Feed](#1-homepage--catalog-feed)
+  - [2. Anime Details & Season Guides](#2-anime-details--season-guides)
+  - [3. Episode Data & Streaming Servers](#3-episode-data--streaming-servers)
+  - [4. Stream Resolvers & Player Extraction](#4-stream-resolvers--player-extraction)
+  - [5. Search & Real-Time Suggestions](#5-search--real-time-suggestions)
+  - [6. Taxonomy & Category Filters](#6-taxonomy--category-filters)
+  - [7. Standalone Movies](#7-standalone-movies)
+  - [8. Developer Test Tools](#8-developer-test-tools)
+- [Video Player Integration](#-video-player-integration)
+- [Deployment](#-deployment)
+- [License](#-license)
+
+---
+
+## ⚡ Features
+
+- **🌐 Multilingual Audio Switching:** Switch seamlessly between Japanese (Original), English, Hindi, Tamil, and Telugu audio tracks in real time within HLS streams.
+- **⏩ Smart Intro & Outro Skipping:** Automatically detects episode opening/ending ranges and provides instant one-click skip overlays.
+- **🛡️ Dynamic HLS & MP4 Proxying:** Intercepts and proxies video streams through dedicated reverse-proxy servers to bypass IP-bound tokens, CORS restrictions, and hotlink protections.
+- **🎨 Cinematic Glassmorphism:** Custom dark-themed UI featuring responsive carousels, backdrop spotlight previews, and fluid animations.
+- **📱 Fully Responsive & Touch-Native:** Tailored for mobile, tablet, and desktop viewing with picture-in-picture (PiP) and Google Cast support.
+- **🔍 Instant Autocomplete Search:** Real-time typeahead suggestions and comprehensive multi-criteria filtering (A–Z, Genres, Types).
+
+---
+
+## 🏗️ Architecture Overview
+
+```mermaid
+flowchart LR
+    User[Client Browser] -->|Next.js 16 App| Frontend[Senkai Sora Frontend]
+    Frontend -->|Metadata & Server List| API[Senkai Sora API\nsenkaisoraapi.vercel.app]
+    Frontend -->|HLS Playlists & Segments| Proxy[Abyss Stream Proxy\nRailway Container]
+    API -->|Scrapes Dub Player| AW[WatchAnimeWorld]
+    Proxy -->|Spoofed Referer & Chunks| CDN[Ravok / as-cdn / Abyss CDN]
+```
+
+1. **Frontend (`/frontend`)**: Next.js 16 app rendering client-side Video.js 10 / Hls.js players and catalog views.
+2. **API (`/api`)**: Express.js backend scraping catalog metadata, multi-season structures, and dub server identifiers.
+3. **Stream Proxy (`/proxy`)**: Railway Docker container handling AES-256 decryption, HLS manifest rewriting, and chunk buffering.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) v18.18.0 or later
+- npm or yarn
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/anime-stream-hindi.git
+cd anime-stream-hindi/frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## ⚙️ Environment Variables
+
+Create `.env` in the `frontend/` root directory:
+
+```env
+# AnimeStream Backend API Base URL
+api_base_url=https://senkaisoraapi.vercel.app/
+API_BASE_URL=https://senkaisoraapi.vercel.app/
+NEXT_PUBLIC_API_URL=https://senkaisoraapi.vercel.app/
+NEXT_PUBLIC_API_BASE_URL=https://senkaisoraapi.vercel.app/
+
+# Abyss Stream Proxy Railway URL & 32-bit Auth Token
+abyss_proxy_url=https://abyss-proxies-production.up.railway.app/
+NEXT_PUBLIC_ABYSS_PROXY_URL=https://abyss-proxies-production.up.railway.app/
+ABYSS_AUTH_TOKEN=9c86dda4c5a4f2a5a30823e6d4dc7ce0
+NEXT_PUBLIC_ABYSS_AUTH_TOKEN=9c86dda4c5a4f2a5a30823e6d4dc7ce0
+```
+
+---
+
+## 📡 Developer Endpoints & API Reference
+
+All backend requests are routed to `NEXT_PUBLIC_API_URL` (`https://senkaisoraapi.vercel.app/`). Click any endpoint below to expand the full documentation.
+
+### 1. Homepage & Catalog Feed
+
+<details>
+<summary><strong>Get Homepage Feed & Spotlight</strong> — <code>GET /api/v1/animeworldin/home</code></summary>
+
+<br />
+
+Returns all 10 curated homepage sections (Spotlight carousel, Trending, Latest Drops, Top Airing, Popular, Movies, etc.).
+
+**Endpoint:**
+```http
+GET /api/v1/animeworldin/home
+GET /home
+```
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `refresh` | `boolean` | No | Set `true` to bypass server cache |
+
+**Response Schema:**
+```json
 {
-  "completed_animes": [
-    "series/black-torch",
-    "series/the-exiled-heavy-knight-knows-how-to-game-the-system",
-    "series/hanaori-san-still-wants-to-fight-in-the-next-life",
-    "series/i-became-a-legend-after-my-10-year-long-last-stand",
-    "series/chainsmoker-cat",
-    "series/heaven-officials-blessing",
-    "series/tomb-raider-king",
-    "series/smoking-behind-the-supermarket-with-you",
-    "series/thunder-3",
-    "series/kurokos-basketball",
-    "series/sparks-of-tomorrow",
-    "series/tamons-b-side",
-    "series/gantz",
-    "series/yowayowa-sensei",
-    "series/farming-life-in-another-world",
-    "series/watari-kuns-is-about-to-collapse",
-    "series/skeleton-knight-in-another-world",
-    "series/arifureta-from-commonplace-to-worlds-strongest",
-    "series/witch-hat-atelier",
-    "series/scum-of-the-brave",
-    "series/grand-blue-dreaming",
-    "series/an-observation-log-of-my-fiancee-who-calls-herself-a-villainess",
-    "series/the-ramparts-of-ice",
-    "series/snowball-earth",
-    "series/agents-of-the-four-seasons-dance-of-spring",
-    "series/marriage-toxin",
-    "series/eren-the-southpaw",
-    "series/liar-game",
-    "series/the-warrior-princess-and-the-barbaric-king",
-    "series/captain-tsubasa",
-    "series/release-that-witch",
-    "series/daemons-of-the-shadow-realm",
-    "series/easygoing-territory-defense-by-the-optimistic-lord",
-    "series/to-be-hero-x",
-    "series/bofuri-i-dont-want-to-get-hurt-so-ill-max-out-my-defense-2",
-    "series/trigun-stampede",
-    "series/yuri-on-ice",
-    "series/a-misanthrope-teaches-a-class-for-demi-humans",
-    "series/roll-over-and-die-i-will-fight-for-an-ordinary-life-with-my-love-and-cursed-sword",
-    "series/an-adventurers-daily-grind-at-age-29",
-    "series/sentenced-to-be-a-hero",
-    "series/there-was-a-cute-girl-in-the-heros-party-so-i-tried-confessing-to-her",
-    "series/kunon-the-sorcerer-can-see",
-    "series/you-and-i-are-polar-opposites",
-    "series/hana-kimi",
-    "movies/shinchan-movie-the-spicy-kasukabe-dancers",
-    "series/tokyo-ghoul",
-    "series/if-my-favorite-pop-idol-made-it-to-the-budokan-i-would-die",
-    "series/dark-moon-the-blood-altar",
-    "series/cells-at-work",
-    "movies/your-name",
-    "series/suicide-squad-isekai",
-    "movies/weathering-with-you",
-    "series/my-clueless-first-friend",
-    "series/reborn-to-master-the-blade-from-hero-king-to-extraordinary-squire-%e2%99%80",
-    "movies/suzume",
-    "series/a-gatherers-adventure-in-isekai",
-    "series/tatsuki-fujimoto-17-26",
-    "movies/doraemon-the-movie-nobitas-earth-symphony",
-    "series/spy-x-family",
-    "movies/jujutsu-kaisen-0",
-    "series/with-you-our-love-will-make-it-through",
-    "series/my-hero-academia-vigilantes",
-    "series/ragna-crimson",
-    "series/remonster",
-    "series/the-summer-hikaru-died-2",
-    "series/mechanical-marie",
-    "series/lets-play",
-    "series/tojima-wants-to-be-a-kamen-rider",
-    "series/a-wild-last-boss-appeared",
-    "series/takopis-original-sin",
-    "series/girls-frontline",
-    "series/heroines-run-the-show",
-    "movies/chainsaw-man-the-movie-reze-arc",
-    "series/my-status-as-an-assassin-obviously-exceeds-the-heros",
-    "series/may-i-ask-for-one-final-thing",
-    "series/let-this-grieving-soul-retire",
-    "series/roboticsnotes",
-    "series/i-left-my-a-rank-party-to-help-my-former-students-reach-the-dungeon-depths",
-    "series/food-wars-shokugeki-no-soma",
-    "series/ghost-in-the-shell-arise",
-    "movies/haikyu-the-dumpster-battle",
-    "movies/demon-slayer-kimetsu-no-yaiba-infinity-castle",
-    "series/after-school-dice-club",
-    "movies/mononoke-the-movie-chapter-ii-the-ashes-of-rage",
-    "movies/lost-in-starlight",
-    "series/shoot-goal-to-the-future",
-    "series/pokemon-concierge",
-    "series/death-note",
-    "series/naruto-shippuden",
-    "series/yaiba-samurai-legend",
-    "series/ive-been-killing-slimes-for-300-years-and-maxed-out-my-level",
-    "series/dekin-no-mogura-the-earthbound-mole",
-    "series/baki-hanma",
-    "series/new-saga",
-    "series/toilet-bound-hanako-kun",
-    "series/my-dress-up-darling",
-    "series/ultraviolet-code-044",
-    "series/lord-of-mysteries",
-    "series/reborn-as-a-vending-machine-i-now-wander-the-dungeon",
-    "series/kurozuka",
-    "series/vipers-creed",
-    "series/akuma-kun",
-    "series/guin-saga",
-    "series/valkyria-chronicles",
-    "series/sakamoto-days",
-    "series/garouden-the-way-of-the-lone-wolf",
-    "series/even-given-the-worthless-appraiser-class-im-actually-the-strongest",
-    "series/your-lie-in-april",
-    "series/fullmetal-alchemist-brotherhood",
-    "series/welcome-to-the-outcasts-restaurant",
-    "series/leviathan",
-    "series/gachiakuta",
-    "series/clevatess",
-    "series/paradox-live-the-animation",
-    "series/teogonia",
-    "series/the-shiunji-family-children",
-    "series/one-punch-man",
-    "series/i-parry-everything",
-    "series/the-gorilla-gods-go-to-girl",
-    "series/once-upon-a-witchs-death",
-    "series/catch-me-at-the-ballpark",
-    "series/mobile-suit-gundam-gquuuuuux",
-    "series/the-beginning-after-the-end",
-    "series/overlord",
-    "series/the-magical-girl-and-the-evil-lieutenant-used-to-be-archenemies",
-    "series/the-unaware-atelier-meister",
-    "series/jojos-bizarre-adventure",
-    "series/the-god-of-high-school",
-    "series/as-a-reincarnated-aristocrat-ill-use-my-appraisal-skill-to-rise-in-the-world",
-    "series/the-maid-i-hired-recently-is-mysterious",
-    "series/the-strongest-tanks-labyrinth-raids-a-tank-with-a-rare-9999-resistance-skill-got-kicked-from-the-heros-party",
-    "series/delicious-in-dungeon",
-    "series/aoashi",
-    "series/chillin-in-another-world-with-level-2-super-cheat-powers",
-    "series/re-zero-starting-life-in-another-world",
-    "series/she-professed-herself-pupil-of-the-wise-man",
-    "series/attack-on-titan",
-    "series/summer-time-rendering",
-    "series/the-angel-next-door-spoils-me-rotten",
-    "series/more-than-a-married-couple-but-not-lovers",
-    "series/junji-ito-collection",
-    "series/mobile-suit-gundam-the-witch-from-mercury",
-    "series/villainess-level-99-i-may-be-the-hidden-boss-but-im-not-the-demon-lord",
-    "series/black-butler",
-    "series/rent-a-girlfriend",
-    "series/black-rock-shooter-dawn-fall",
-    "series/my-happy-marriage",
-    "series/ameku-m-d-doctor-detective",
-    "series/bleach-thousand-year-blood-war",
-    "series/buddy-daddies",
-    "series/kamikatsu-working-for-god-in-a-godless-world",
-    "series/code-geass-lelouch-of-the-rebellion",
-    "series/handyman-saitou-in-another-world",
-    "series/i-got-a-cheat-skill-in-another-world-and-became-unrivaled-in-the-real-world-too",
-    "series/akudama-drive",
-    "series/berserk-of-gluttony",
-    "series/a-salad-bowl-of-eccentrics",
-    "series/hunter-x-hunter",
-    "series/a-couple-of-cuckoos",
-    "series/my-one-hit-kill-sister",
-    "series/zom-100-bucket-list-of-the-dead",
-    "series/reign-of-the-seven-spellblades",
-    "series/masamune-kuns-revenge",
-    "series/the-case-study-of-vanitas",
-    "series/im-in-love-with-the-villainess",
-    "series/my-love-story-with-yamada-kun-at-lv999",
-    "series/tomo-chan-is-a-girl",
-    "series/trapped-in-a-dating-sim-the-world-of-otome-games-is-tough-for-mobs",
-    "series/fairy-tail",
-    "series/the-worlds-finest-assassin-gets-reincarnated-in-another-world-as-an-aristocrat",
-    "series/the-wrong-way-to-use-healing-magic",
-    "series/fairy-tail-100-years-quest",
-    "series/ranking-of-kings-the-treasure-chest-of-courage",
-    "series/relife",
-    "series/ranking-of-kings",
-    "series/frieren-beyond-journeys-end",
-    "series/the-red-ranger-becomes-an-adventurer-in-another-world",
-    "series/radiant",
-    "series/solo-leveling",
-    "series/im-getting-married-to-a-girl-i-hate-in-my-class",
-    "series/vampire-dormitory",
-    "series/possibly-the-greatest-alchemist-of-all-time",
-    "series/the-reincarnation-of-the-strongest-exorcist-in-another-world",
-    "series/the-many-sides-of-voice-actor-radio",
-    "series/the-great-cleric",
-    "series/the-detective-is-already-dead",
-    "series/welcome-to-demon-school-iruma-kun",
-    "series/the-apothecary-diaries",
-    "series/the-ancient-magus-bride",
-    "series/an-archdemons-dilemma-how-to-love-your-elf-bride",
-    "series/why-raeliana-ended-up-at-the-dukes-mansion",
-    "series/my-unique-skill-makes-me-op-even-at-level-1",
-    "series/dead-mount-death-play",
-    "series/my-tiny-senpai",
-    "series/metallic-rouge",
-    "series/true-beauty",
-    "series/bartender-glass-of-god",
-    "series/zenshu",
-    "series/dr-stone",
-    "series/a-condition-called-love",
-    "series/magic-maker-how-to-make-magic-in-another-world",
-    "series/tokyo-24th-ward",
-    "series/miss-kuroitsu-from-the-monster-development-department",
-    "series/the-weakest-tamer-began-a-journey-to-pick-up-trash",
-    "series/hokkaido-gals-are-super-adorable",
-    "series/bucchigiri",
-    "series/mashle-magic-and-muscles",
-    "movies/mononoke-the-movie-the-phantom-in-the-rain",
-    "series/the-iceblade-sorcerer-shall-rule-the-world",
-    "series/viral-hit",
-    "movies/spy-x-family-movie-code-white",
-    "series/wind-breaker",
-    "series/tsukimichi-moonlit-fantasy",
-    "series/tokyo-revengers",
-    "series/fire-force",
-    "series/campfire-cooking-in-another-world-with-my-absurd-skill",
-    "series/one-piece",
-    "series/sword-art-online-alternative-gun-gale-online",
-    "series/the-daily-life-of-the-immortal-king",
-    "movies/look-back",
-    "series/dragon-ball-daima",
-    "series/ranma-%c2%bd-2024",
-    "series/sword-art-online",
-    "movies/dragon-ball-z-battle-of-gods",
-    "series/rurouni-kenshin-2023",
-    "series/you-are-ms-servant",
-    "series/demon-lord-retry",
-    "series/mushoku-tensei-jobless-reincarnation",
-    "series/shangri-la-frontier",
-    "series/lookism",
-    "series/good-bye-dragon-life",
-    "series/365-days-to-the-wedding",
-    "series/trillion-game",
-    "series/dan-da-dan",
-    "series/ill-become-a-villainess-who-goes-down-in-history",
-    "series/nina-the-starry-bride",
-    "series/tying-the-knot-with-an-amagami-sister",
-    "series/assassination-classroom",
-    "series/darling-in-the-franxx",
-    "movies/shinchan-the-movie-mr-smellys-ambition",
-    "series/chainsaw-man",
-    "series/dragon-ball",
-    "series/log-horizon",
-    "movies/baki-hanma-vs-kengan-ashura",
-    "movies/pokemon-heroes",
-    "series/haikyu",
-    "movies/dragon-ball-super-super-hero",
-    "series/pokemon-horizons-the-series",
-    "series/vinland-saga",
-    "movies/spirited-away",
-    "movies/pokemon-4ever",
-    "movies/black-clover-sword-of-the-wizard-king",
-    "movies/howls-moving-castle",
-    "movies/altered-carbon-resleeved",
-    "movies/my-neighbor-totoro",
-    "movies/pokemon-3-the-movie",
-    "movies/pokemon-zoroark-master-of-illusions",
-    "movies/pokemon-the-movie-mewtwo-strikes-back-evolution",
-    "movies/pokemon-the-movie-volcanion-and-the-mechanical-marvel",
-    "movies/pokemon-ranger-and-the-temple-of-the-sea",
-    "movies/pokemon-the-movie-secrets-of-the-jungle",
-    "movies/pokemon-the-movie-the-power-of-us",
-    "movies/pokemon-lucario-and-the-mystery-of-mew",
-    "movies/pokemon-the-first-movie",
-    "movies/pokemon-the-movie-kyurem-vs-the-sword-of-justice",
-    "movies/pokemon-jirachi-wish-maker",
-    "movies/pokemon-the-movie-hoopa-and-the-clash-of-ages",
-    "movies/pokemon-the-movie-i-choose-you",
-    "movies/sinbad-the-magical-lamp-and-the-moving-island",
-    "movies/sinbad-the-flying-princess-and-the-secret-island",
-    "movies/sinbad-night-at-high-noon-and-the-wonder-gate",
-    "movies/shinchan-pursuit-of-the-balls-of-darkness",
-    "movies/pokemon-the-movie-genesect-and-the-legend-awakened",
-    "movies/evangelion-3-01-0-thrice-upon-a-time",
-    "movies/pokemon-destiny-deoxys",
-    "movies/pokemon-the-rise-of-darkrai",
-    "movies/pokemon-the-movie-diancie-and-the-cocoon-of-destruction",
-    "movies/pokemon-arceus-and-the-jewel-of-life",
-    "movies/evangelion-3-0-you-can-not-redo",
-    "movies/pokemon-the-movie-black-victini-and-reshiram",
-    "movies/stand-by-me-doraemon-2",
-    "movies/evangelion-2-0-you-can-not-advance",
-    "movies/evangelion-1-0-you-are-not-alone",
-    "movies/beyblade-the-movie-fierce-battle",
-    "movies/metal-fight-beyblade-vs-the-sun-sol-blaze-the-scorching-hot-invader",
-    "series/no-longer-allowed-in-another-world",
-    "series/vtuber-legend-how-i-went-viral-after-forgetting-to-turn-off-my-stream",
-    "series/wistoria-wand-and-sword",
-    "series/why-does-nobody-remember-me-in-this-world",
-    "series/twilight-out-of-focus",
-    "series/makeine-too-many-losing-heroines",
-    "series/the-elusive-samurai",
-    "series/days-with-my-stepsister",
-    "series/alya-sometimes-hides-her-feelings-in-russian",
-    "series/bye-bye-earth",
-    "series/the-strongest-magician-in-the-demon-lords-army-was-a-human",
-    "series/banished-from-the-heros-party-i-decided-to-live-a-quiet-life-in-the-countryside",
-    "series/black-clover",
-    "series/naruto",
-    "series/jujutsu-kaisen",
-    "series/that-time-i-got-reincarnated-as-a-slime",
-    "series/kaiju-no-8",
-    "series/gods-games-we-play",
-    "series/akebis-sailor-uniform",
-    "series/tower-of-god",
-    "series/blue-lock",
-    "series/dragon-ball-z-kai",
-    "series/doraemon",
-    "series/shinchan",
-    "series/the-gutsy-frog",
-    "series/beywheelz",
-    "series/ghost-in-the-shell-sac_2045",
-    "series/digimon-adventure",
-    "series/dino-girl-gauko",
-    "series/ninja-hattori-returns",
-    "series/beyblade-metal-saga",
-    "series/ninja-hattori-1981",
-    "series/beyblade-burst",
-    "series/doraemon-2005",
-    "series/super-shiro",
-    "series/dragon-ball-super",
-    "series/pokemon-journeys-the-series",
-    "series/pokemon-the-series-sun-moon",
-    "series/dragon-ball-z",
-    "series/pokemon-the-series-xy",
-    "series/pokemon-the-series-black-white",
-    "series/pokemon-the-series-diamond-and-pearl",
-    "series/pokemon-the-series-ruby-and-sapphire",
-    "series/pokemon-the-series-gold-and-silver",
-    "series/star-wars-visions",
-    "series/iron-man",
-    "movies/my-oni-girl",
-    "series/future-avengers",
-    "series/demon-slayer",
-    "series/pokemon-the-series-the-beginning",
-    "series/my-hero-academia"
-  ],
-  "stats": {
-    "total_animes": 337,
-    "total_episodes": 9871
+  "success": true,
+  "cached": false,
+  "data": {
+    "spotlight": [
+      {
+        "id": "series/jujutsu-kaisen",
+        "title": "Jujutsu Kaisen",
+        "banner": "https://.../banner.jpg",
+        "image": "https://.../poster.jpg",
+        "synopsis": "A boy fights curses...",
+        "rating": "8.7"
+      }
+    ],
+    "trending": [...],
+    "newest-drops": [...],
+    "most-popular": [...]
   }
 }
+```
+</details>
+
+---
+
+### 2. Anime Details & Season Guides
+
+<details>
+<summary><strong>Get Anime Information & Episode Guide</strong> — <code>GET /api/v1/animeworldin/animeinfo/:id</code></summary>
+
+<br />
+
+Fetches full anime metadata, synopsis, genres, voice languages, and multi-season episode lists stitched into a single payload.
+
+**Endpoint:**
+```http
+GET /api/v1/animeworldin/animeinfo/:id
+GET /animeinfo/:id
+```
+
+**Parameters:**
+| Parameter | Type | In | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `string` | Path | Anime slug (e.g. `series/solo-leveling` or `solo-leveling`) |
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "series/solo-leveling",
+    "title": "Solo Leveling",
+    "image": "https://.../poster.jpg",
+    "genres": ["Action", "Fantasy"],
+    "rating": "8.5",
+    "seasons": [
+      {
+        "season": 1,
+        "title": "Season 1",
+        "episodes": [
+          {
+            "id": "episode/solo-leveling-1x1",
+            "episode": 1,
+            "title": "I'm Used to It",
+            "image": "https://.../ep1.jpg"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+</details>
+
+---
+
+### 3. Episode Data & Streaming Servers
+
+<details>
+<summary><strong>Get Episode Details & Stream Servers Endpoint</strong> — <code>GET /episode/:id</code></summary>
+
+<br />
+
+Retrieves current episode details, previous/next links, and the stream server parameters (`abyssId`, `playXID`).
+
+**Endpoint:**
+```http
+GET /episode/:id
+```
+
+**Parameters:**
+| Parameter | Type | In | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `string` | Path | Episode slug (e.g. `jujutsu-kaisen-1x1`) |
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "data": {
+    "episodeId": "jujutsu-kaisen-1x1",
+    "title": "Ryomen Sukuna",
+    "runningEpisode": { "season": 1, "episode": 1 },
+    "streamInfo": {
+      "abyssId": "8073",
+      "playXID": "0a09c8844ba8f0936c20bd791130d6b6",
+      "serversEndpoint": "/stream/servers/?playXID=0a09c8844ba8f0936c20bd791130d6b6&abyssId=8073"
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>Get Streaming Servers & Multi-Audio Sources</strong> — <code>GET /stream/servers/</code></summary>
+
+<br />
+
+Returns all streaming providers (**Abyss**, **PlayX / Sora**) along with regional dub tracks (Hindi, English, Japanese, Tamil, Telugu).
+
+**Endpoint:**
+```http
+GET /stream/servers/?playXID=:playXID&abyssId=:abyssId
+GET /stream/servers/:streamId
+```
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `playXID` | `string` | Optional | 32-character hex ID for Ravok / PlayX server |
+| `abyssId` | `string` | Optional | Numeric stream ID for Abyss dub player |
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "data": {
+    "streamId": "8073",
+    "servers": [
+      {
+        "serverName": "abyss",
+        "server": "ABYSS",
+        "languages": [
+          { "language": "Hindi", "code": "hin", "video_id": "YaXd-lvb0" },
+          { "language": "Japanese", "code": "jpn", "video_id": "k1RERPJ7W" }
+        ]
+      },
+      {
+        "serverName": "playx",
+        "server": "PlayX",
+        "streamUrl": "https://abyss-proxies-production.up.railway.app/player/stream/proxy?url=...",
+        "languages": [
+          { "language": "multi", "code": "multi", "video_id": "0a09c8844ba8f0936c20bd791130d6b6" }
+        ]
+      }
+    ],
+    "defaultSource": {
+      "serverName": "abyss",
+      "language": "Hindi",
+      "video_id": "YaXd-lvb0"
+    }
+  }
+}
+```
+</details>
+
+---
+
+### 4. Stream Resolvers & Player Extraction
+
+<details>
+<summary><strong>Resolve Abyss Stream Video (MP4 / HLS Chunks)</strong> — <code>GET /resolve/:videoId</code></summary>
+
+<br />
+
+Directly queries the dedicated Railway proxy to resolve an Abyss video ID into progressive MP4 streams and dynamic playlists.
+
+**Endpoint:**
+```http
+GET https://abyss-proxies-production.up.railway.app/resolve/:videoId?token=:token
+```
+
+**Parameters & Headers:**
+| Name | Type | In | Description |
+| :--- | :--- | :--- | :--- |
+| `videoId` | `string` | Path | Abyss video slug (e.g. `YaXd-lvb0`) |
+| `token` | `string` | Query / Header | 32-bit authorization token (`x-auth-token`) |
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "id": "YaXd-lvb0",
+  "availableResolutions": ["1080p", "720p", "360p"],
+  "streamUrl": "https://abyss-proxies-production.up.railway.app/stream/YaXd-lvb0?token=...",
+  "sources": [
+    {
+      "label": "1080p",
+      "codec": "h264",
+      "directStreamUrl": "https://abyss-proxies-production.up.railway.app/stream/YaXd-lvb0?res=1080p&token=...",
+      "directHlsPlaylist": "https://abyss-proxies-production.up.railway.app/hls/YaXd-lvb0/playlist.m3u8?res=1080p&token=..."
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>Get PlayX / Sora Stream Metadata, Intro/Outro & Subtitles</strong> — <code>GET /player/data/:videoId</code></summary>
+
+<br />
+
+Extracts Ravok stream URLs, intro/outro timestamps (e.g. `55-144`), AES-256 decryption keys, and disguised subtitle tracks converted to WebVTT.
+
+**Endpoint:**
+```http
+GET https://abyss-proxies-production.up.railway.app/player/data/:videoId
+GET /api/player/data/:videoId
+```
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "videoId": "0a09c8844ba8f0936c20bd791130d6b6",
+  "title": "Jujutsu Kaisen - Episode 1",
+  "intro": { "start": 55, "end": 144, "duration": 89, "enabled": true },
+  "outro": { "start": 0, "end": 0, "duration": 0, "enabled": false },
+  "hls": true,
+  "streamProxyUrl": "https://abyss-proxies-production.up.railway.app/player/stream/proxy?url=...",
+  "subtitles": [
+    {
+      "label": "English",
+      "language": "eng",
+      "proxyUrl": "https://abyss-proxies-production.up.railway.app/player/subtitle/proxy?url=..."
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>Proxied HLS Stream & Segment Router</strong> — <code>GET /player/stream/proxy</code></summary>
+
+<br />
+
+Proxies the master `.m3u8`, child resolution playlists, and individual media segments (`.js` / `.ts` / fMP4 chunks) with spoofed referer headers.
+
+**Endpoint:**
+```http
+GET https://abyss-proxies-production.up.railway.app/player/stream/proxy?url=:targetUrl&videoId=:videoId
+```
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `url` | `string` | Yes | URL-encoded upstream `.m3u8` or segment URL |
+| `videoId` | `string` | Optional | Video ID for auto-healing 403 token expirations |
+
+**Response:**
+Returns `#EXTM3U` content with rewritten proxy URLs or binary `video/MP2T` chunks with open CORS (`Access-Control-Allow-Origin: *`).
+</details>
+
+---
+
+### 5. Search & Real-Time Suggestions
+
+<details>
+<summary><strong>Full-Text Search with Pagination</strong> — <code>GET /search</code></summary>
+
+<br />
+
+Searches anime titles with pagination support.
+
+**Endpoint:**
+```http
+GET /search?s=:query&page=:page
+```
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `s` | `string` | Yes | Search query string (e.g. `naruto`) |
+| `page` | `number` | No | Page number (default: `1`) |
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "query": "naruto",
+  "page": 1,
+  "totalPages": 4,
+  "hasNextPage": true,
+  "results": [
+    {
+      "id": "series/naruto-shippuden",
+      "title": "Naruto Shippuden",
+      "image": "https://.../poster.jpg",
+      "rating": "8.7"
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>Instant Autocomplete Suggestions</strong> — <code>GET /search-suggestion</code></summary>
+
+<br />
+
+Lightweight typeahead endpoint designed for search bar autocomplete popups.
+
+**Endpoint:**
+```http
+GET /search-suggestion?term=:query
+```
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "term": "jujutsu",
+  "totalResults": 2,
+  "suggestions": [
+    {
+      "id": "series/jujutsu-kaisen",
+      "title": "Jujutsu Kaisen",
+      "image": "https://.../thumb.jpg",
+      "year": "2020"
+    }
+  ]
+}
+```
+</details>
+
+---
+
+### 6. Taxonomy & Category Filters
+
+<details>
+<summary><strong>Browse by Genre</strong> — <code>GET /genre/:genre</code></summary>
+
+<br />
+
+Returns paginated anime items belonging to a specific genre.
+
+**Endpoint:**
+```http
+GET /genre/:genre?page=:page
+```
+
+**Parameters:**
+| Parameter | Type | In | Description |
+| :--- | :--- | :--- | :--- |
+| `genre` | `string` | Path | Genre slug (e.g. `action`, `shounen`, `fantasy`, `romance`) |
+| `page` | `number` | Query | Page number |
+</details>
+
+<details>
+<summary><strong>Browse A–Z Alphabetical Index</strong> — <code>GET /az-list/:letter</code></summary>
+
+<br />
+
+Retrieves anime titles beginning with a specific letter or numeric symbol (`0-9`).
+
+**Endpoint:**
+```http
+GET /az-list/:letter?page=:page
+```
+
+**Parameters:**
+| Parameter | Type | In | Description |
+| :--- | :--- | :--- | :--- |
+| `letter` | `string` | Path | Single character `a`–`z` or `0-9` |
+</details>
+
+<details>
+<summary><strong>Browse by Category / Taxonomy</strong> — <code>GET /category/:slug</code></summary>
+
+<br />
+
+Filters catalog by category taxonomy (e.g. `anime`, `cartoons`, `dubbed`, `subbed`).
+
+**Endpoint:**
+```http
+GET /category/:slug?page=:page
+```
+</details>
+
+---
+
+### 7. Standalone Movies
+
+<details>
+<summary><strong>Get Standalone Movie Details & Stream</strong> — <code>GET /movie/:id</code></summary>
+
+<br />
+
+Extracts metadata, synopsis, dub languages, and stream IDs for standalone anime feature films.
+
+**Endpoint:**
+```http
+GET /movie/:id
+```
+
+**Parameters:**
+| Parameter | Type | In | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `string` | Path | Movie slug (e.g. `jujutsu-kaisen-0` or `your-name`) |
+</details>
+
+---
+
+### 8. Developer Test Tools
+
+<details>
+<summary><strong>Developer Test Tools & Diagnostics</strong> — <code>/dev/extract</code> & <code>/dev/iframe</code></summary>
+
+<br />
+
+Interactive in-browser testing consoles hosted on the API server:
+- **Scraper HTML Extractor:** `https://senkaisoraapi.vercel.app/dev/extract`
+- **Iframe Proxy Live Tester:** `https://senkaisoraapi.vercel.app/dev/iframe`
+- **Proxy Stream Tester:** `https://abyss-proxies-production.up.railway.app/player`
+</details>
+
+---
+
+## 🎬 Video Player Integration
+
+The frontend utilizes a custom `AnimeVideoPlayer` built on Video.js 10 and Hls.js:
+
+```tsx
+import { AnimeVideoPlayer } from "@/components/AnimeVideoPlayer";
+
+<AnimeVideoPlayer
+  title="Jujutsu Kaisen"
+  episodeTitle="Ryomen Sukuna"
+  seasonNumber={1}
+  episodeNumber={1}
+  serverName="sora"
+  qualities={[
+    { label: "1080p (Sora)", url: streamProxyUrl },
+    { label: "Auto", url: streamProxyUrl },
+  ]}
+  currentQuality="1080p (Sora)"
+  onQualityChange={(q) => handleQualityChange(q)}
+  intro={{ start: 55, end: 144, enabled: true }}
+  subtitles={subtitlesList}
+  autoSkipIntro={true}
+/>
+```
+
+---
+
+## 📦 Deployment
+
+### Deploy on Vercel
+
+The frontend is optimized for deployment on Vercel:
+
+1. Push your code to GitHub.
+2. Import the project into the [Vercel Dashboard](https://vercel.com/new).
+3. Set the Root Directory to `frontend`.
+4. Configure environment variables (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ABYSS_PROXY_URL`, `NEXT_PUBLIC_ABYSS_AUTH_TOKEN`).
+5. Deploy.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](file:///e:/anime-stream-hindi/LICENSE) file for details. Built for educational and non-commercial streaming research.
