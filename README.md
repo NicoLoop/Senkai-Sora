@@ -12,6 +12,7 @@
 
 ## 📑 Table of Contents
 
+- [Screenshots & Previews](#-screenshots--previews)
 - [Features](#-features)
 - [Architecture Overview](#-architecture-overview)
 - [Getting Started](#-getting-started)
@@ -20,6 +21,21 @@
 - [Project Structure](#-project-structure)
 - [Deployment](#-deployment)
 - [License](#-license)
+
+---
+
+## 📸 Screenshots & Previews
+
+### 🖥️ Desktop Home Page
+<p align="center">
+  <img src="public/Screenshot%202026-10-16%20203858.png" alt="Desktop Home Page" width="100%" />
+</p>
+
+### 📱 Mobile Experience
+
+| Mobile Home | Anime Details & Seasons | Streaming Player |
+| :---: | :---: | :---: |
+| <img src="public/Screenshot%202026-10-17%20152736.png" alt="Mobile Home" width="280" /> | <img src="public/Screenshot%202026-10-17%20152755.png" alt="Anime Details" width="280" /> | <img src="public/Screenshot%202026-10-17%20152955.png" alt="Streaming Player" width="280" /> |
 
 ---
 
@@ -46,17 +62,22 @@ flowchart LR
 ```
 
 1. **Frontend (`/frontend`)**: Next.js 16 app rendering client-side Video.js 10 / Hls.js players and catalog views.
-2. **API (`/api`)**: Express.js backend scraping catalog metadata, multi-season structures, and dub server identifiers.
+2. **API (`/api`)**: Express.js backend scraping catalog metadata, multi-season structures, and dub server identifiers ([Senkai-Sora-Api Repository](https://github.com/NicoLoop/Senkai-Sora-Api)).
 3. **Stream Proxy (`/proxy`)**: Railway Docker container handling AES-256 decryption, HLS manifest rewriting, and chunk buffering.
 
 ---
 
 ## 🚀 Getting Started
 
+> [!IMPORTANT]
+> **Step 1: Deploy the Backend API First!**  
+> Before setting up and launching the frontend, you must first deploy the backend API from the **[Senkai-Sora-Api](https://github.com/NicoLoop/Senkai-Sora-Api)** repository (e.g. on Vercel). Once deployed, copy your API URL and set it as `api_base_url` / `NEXT_PUBLIC_API_URL` in your `.env` configuration file.
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18.18.0 or later
 - npm, yarn, or pnpm
+- Deployed API instance from [Senkai-Sora-Api](https://github.com/NicoLoop/Senkai-Sora-Api)
 
 ### Installation
 
@@ -78,10 +99,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## ⚙️ Environment Variables
 
-Create `.env` or `.env.local` in the `frontend/` root directory:
+Create `.env` or `.env.local` in the `frontend/` root directory. Replace the API URLs with your deployed [Senkai-Sora-Api](https://github.com/NicoLoop/Senkai-Sora-Api) endpoint:
 
 ```env
-# AnimeStream Backend API Base URL
+# AnimeStream Backend API Base URL (Replace with your deployed API URL)
 api_base_url=https://senkaisoraapi.vercel.app/
 API_BASE_URL=https://senkaisoraapi.vercel.app/
 NEXT_PUBLIC_API_URL=https://senkaisoraapi.vercel.app/
@@ -157,11 +178,12 @@ frontend/
 
 The frontend is optimized for deployment on Vercel:
 
-1. Push your code to GitHub.
-2. Import the project into the [Vercel Dashboard](https://vercel.com/new).
-3. Set the Root Directory to `frontend`.
-4. Configure environment variables (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ABYSS_PROXY_URL`, `NEXT_PUBLIC_ABYSS_AUTH_TOKEN`).
-5. Deploy.
+1. **Deploy API First:** Ensure you have deployed your backend instance from [Senkai-Sora-Api](https://github.com/NicoLoop/Senkai-Sora-Api).
+2. Push your frontend code to GitHub.
+3. Import the project into the [Vercel Dashboard](https://vercel.com/new).
+4. Set the Root Directory to `frontend`.
+5. Configure environment variables (`NEXT_PUBLIC_API_URL` set to your deployed API URL, `NEXT_PUBLIC_ABYSS_PROXY_URL`, `NEXT_PUBLIC_ABYSS_AUTH_TOKEN`).
+6. Deploy.
 
 ---
 
