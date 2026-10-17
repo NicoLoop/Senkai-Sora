@@ -37,7 +37,12 @@ export interface GuestUserProfile {
 export function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp("(^|;\\s*)(" + name + ")=([^;]*)"));
-  return match ? decodeURIComponent(match[3]) : null;
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[3]);
+  } catch {
+    return match[3];
+  }
 }
 
 export function setCookie(name: string, value: string, days = 3650) {
@@ -193,17 +198,25 @@ export function clearWatchHistory() {
 export interface PlayerControlsSettings {
   server: "sora" | "abyss";
   type: "sub" | "dub";
+  sub: "on" | "off";
+  dub: string;
+  vol: string; // e.g. "100%", "50%"
+  volumeNumber: number; // 0 to 1
   expand: boolean;
   light: boolean;
   autoplay: boolean;
   autoNext: boolean;
   autoSkip: boolean;
-  language: string;
+  language: string; // legacy alias for dub
 }
 
 export const DEFAULT_PLAYER_CONTROLS: PlayerControlsSettings = {
   server: "sora",
   type: "dub",
+  sub: "on",
+  dub: "hindi",
+  vol: "100%",
+  volumeNumber: 1,
   expand: false,
   light: true,
   autoplay: true,
@@ -216,10 +229,61 @@ const PLAYER_CONTROLS_COOKIE = "senkai_player_controls";
 
 export function getPlayerControls(): PlayerControlsSettings {
   try {
+    let settings: Partial<PlayerControlsSettings> = {};
     const raw = getCookie(PLAYER_CONTROLS_COOKIE);
-    if (!raw) return DEFAULT_PLAYER_CONTROLS;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_PLAYER_CONTROLS, ...parsed };
+    if (raw) {
+      try {
+        settings = JSON.parse(raw);
+      } catch (_) {}
+    }
+
+    // Direct standalone cookies: type, sub, dub, vol, server
+    const cType = getCookie("type");
+    if (cType === "sub" || cType === "dub") {
+      settings.type = cType;
+    }
+
+    const cSub = getCookie("sub");
+    if (cSub === "on" || cSub === "off") {
+      settings.sub = cSub;
+    }
+
+    const cDub = getCookie("dub");
+    if (cDub) {
+      settings.dub = cDub;
+      settings.language = cDub;
+    }
+
+    const cVol = getCookie("vol");
+    if (cVol) {
+      const trimmed = cVol.trim();
+      settings.vol = trimmed.endsWith("%") ? trimmed : `${trimmed}%`;
+      const num = parseFloat(trimmed.replace("%", ""));
+      if (!isNaN(num)) {
+        settings.volumeNumber = Math.max(0, Math.min(1, num > 1 ? num / 100 : num));
+      }
+    }
+
+    const cServer = getCookie("server");
+    if (cServer) {
+      const lower = cServer.toLowerCase();
+      if (lower === "sora" || lower === "abyss") {
+        settings.server = lower;
+      }
+    }
+
+    const merged = { ...DEFAULT_PLAYER_CONTROLS, ...settings };
+    if (!merged.dub && merged.language) {
+      merged.dub = merged.language;
+    }
+    if (!merged.vol) {
+      merged.vol = `${Math.round((merged.volumeNumber ?? 1) * 100)}%`;
+    }
+    if (merged.volumeNumber === undefined) {
+      const num = parseFloat((merged.vol || "100%").replace("%", ""));
+      merged.volumeNumber = isNaN(num) ? 1 : Math.max(0, Math.min(1, num > 1 ? num / 100 : num));
+    }
+    return merged;
   } catch {
     return DEFAULT_PLAYER_CONTROLS;
   }
@@ -228,6 +292,36 @@ export function getPlayerControls(): PlayerControlsSettings {
 export function savePlayerControls(settings: Partial<PlayerControlsSettings>): PlayerControlsSettings {
   const current = getPlayerControls();
   const updated: PlayerControlsSettings = { ...current, ...settings };
+
+  // Sync dub and language
+  if (settings.dub && !settings.language) {
+    updated.language = settings.dub;
+  } else if (settings.language && !settings.dub) {
+    updated.dub = settings.language;
+  }
+
+  // Sync vol and volumeNumber
+  if (settings.volumeNumber !== undefined) {
+    updated.volumeNumber = Math.max(0, Math.min(1, settings.volumeNumber));
+    updated.vol = `${Math.round(updated.volumeNumber * 100)}%`;
+  } else if (settings.vol !== undefined) {
+    const trimmed = settings.vol.trim();
+    updated.vol = trimmed.endsWith("%") ? trimmed : `${trimmed}%`;
+    const num = parseFloat(trimmed.replace("%", ""));
+    if (!isNaN(num)) {
+      updated.volumeNumber = Math.max(0, Math.min(1, num > 1 ? num / 100 : num));
+      updated.vol = `${Math.round(updated.volumeNumber * 100)}%`;
+    }
+  }
+
+  // Save standalone cookies (type, sub, dub, vol, server) for 10 years (3650 days)
+  if (updated.type) setCookie("type", updated.type, 3650);
+  if (updated.sub) setCookie("sub", updated.sub, 3650);
+  if (updated.dub) setCookie("dub", updated.dub.toLowerCase(), 3650);
+  if (updated.vol) setCookie("vol", updated.vol, 3650);
+  if (updated.server) setCookie("server", updated.server.toLowerCase(), 3650);
+
+  // Also persist full config object in senkai_player_controls
   setCookie(PLAYER_CONTROLS_COOKIE, JSON.stringify(updated), 3650);
   return updated;
 }

@@ -337,11 +337,18 @@ function AnimeDynamicContent({ params }: PageProps) {
           setAudioLanguages(abyssLangs);
         }
 
+        const controls = getPlayerControls();
+        const preferredDub = (targetLangName || controls.dub || controls.language || "hindi").toLowerCase();
+
         const chosenTrack =
-          (targetLangName &&
-            abyssLangs.find(
-              (l) => l.language.toLowerCase() === targetLangName.toLowerCase()
-            )) ||
+          abyssLangs.find(
+            (l) => l.language.toLowerCase() === preferredDub || l.code?.toLowerCase() === preferredDub
+          ) ||
+          abyssLangs.find(
+            (l) =>
+              l.language.toLowerCase().includes(preferredDub) ||
+              (preferredDub.includes("hin") && (l.code === "hin" || l.language.toLowerCase().includes("hindi")))
+          ) ||
           abyssLangs.find(
             (l) =>
               l.code === "hin" ||
@@ -351,6 +358,12 @@ function AnimeDynamicContent({ params }: PageProps) {
 
         if (chosenTrack) {
           setSelectedLanguage(chosenTrack.language);
+          savePlayerControls({
+            server: normServer as any,
+            type: "dub",
+            dub: chosenTrack.language,
+            language: chosenTrack.language,
+          });
           if (chosenTrack.videoId && targetServer.serverName.toLowerCase() === "abyss") {
             setIsResolvingStream(true);
             try {
@@ -523,14 +536,17 @@ function AnimeDynamicContent({ params }: PageProps) {
                 setAudioLanguages(abyssLangs);
               }
 
+              const savedControls = getPlayerControls();
               const defaultServerKey =
                 selectedServerNameRef.current ||
+                savedControls.server ||
                 serversRes.data.defaultSource?.serverName ||
                 srvs[0]?.serverName ||
                 "sora";
-              const defaultMode = activeAudioModeRef.current || "dub";
+              const defaultMode = activeAudioModeRef.current || savedControls.type || "dub";
+              const defaultDubLang = savedControls.dub || savedControls.language || "hindi";
 
-              await activateServer(defaultServerKey, undefined, defaultMode, srvs);
+              await activateServer(defaultServerKey, defaultDubLang, defaultMode, srvs);
               foundDirectUrl = true;
             }
           }
@@ -588,12 +604,21 @@ function AnimeDynamicContent({ params }: PageProps) {
                 directUrl: p.sourceUrl,
               }));
               setAudioLanguages(langs);
-              const hindiTrack =
+              const savedControls = getPlayerControls();
+              const preferredDub = (savedControls.dub || savedControls.language || "hindi").toLowerCase();
+              const targetTrack =
+                langs.find((l) => l.language.toLowerCase() === preferredDub) ||
+                langs.find((l) => l.language.toLowerCase().includes(preferredDub)) ||
                 langs.find((l) => l.language.toLowerCase().includes("hin")) ||
                 langs[0];
-              if (hindiTrack) {
-                setVideoQualities([{ label: "Default", url: hindiTrack.directUrl }]);
-                setSelectedLanguage(hindiTrack.language);
+              if (targetTrack) {
+                setVideoQualities([{ label: "Default", url: targetTrack.directUrl }]);
+                setSelectedLanguage(targetTrack.language);
+                savePlayerControls({
+                  dub: targetTrack.language,
+                  language: targetTrack.language,
+                  type: "dub",
+                });
               }
             } else if (m.players && m.players.length > 0) {
               setVideoQualities([{ label: "Default", url: m.players[0].embedUrl }]);
@@ -702,7 +727,12 @@ function AnimeDynamicContent({ params }: PageProps) {
     directUrl?: string;
   }) => {
     setSelectedLanguage(lang.language);
-    savePlayerControls({ language: lang.language });
+    const isJp = lang.language.toLowerCase().includes("japan") || lang.code === "ja";
+    savePlayerControls({
+      language: lang.language,
+      dub: isJp ? undefined : lang.language,
+      type: isJp ? "sub" : "dub",
+    });
 
     if (lang.videoId && selectedServerName.toLowerCase() === "abyss") {
       setIsResolvingStream(true);

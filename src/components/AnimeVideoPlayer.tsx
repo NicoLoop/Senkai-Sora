@@ -368,13 +368,21 @@ export function AnimeVideoPlayer({
   const [activeSubtitle, setActiveSubtitle] = useState<string>("English");
 
   useEffect(() => {
+    const controls = getPlayerControls();
+    const isSubOn = controls.sub !== "off";
+
     if (subtitles && subtitles.length > 0) {
-      const def = subtitles.find((s) => s.default) || subtitles[0];
-      setActiveSubtitle(def.label || def.language || "English");
+      if (!isSubOn) {
+        setActiveSubtitle("Off");
+      } else {
+        const def = subtitles.find((s) => s.default) || subtitles[0];
+        setActiveSubtitle(def.label || def.language || "English");
+      }
     } else {
       setActiveSubtitle("Off");
     }
   }, [subtitles]);
+
 
   // Thumbnail preview cues and hover state
   const thumbnailCuesRef = useRef<ThumbnailCue[]>([]);
@@ -446,7 +454,15 @@ export function AnimeVideoPlayer({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
   const [bufferedPercent, setBufferedPercent] = useState<number>(0);
-  const [volume, setVolume] = useState<number>(1);
+  const [volume, setVolume] = useState<number>(() => {
+    try {
+      const c = getPlayerControls();
+      return typeof c.volumeNumber === "number" ? c.volumeNumber : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const lastSavedVolumeRef = useRef<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [isLooping, setIsLooping] = useState<boolean>(false);
@@ -619,6 +635,28 @@ export function AnimeVideoPlayer({
     activeStreamUrl.includes("/hls/") ||
     activeStreamUrl.includes("/stream/proxy");
 
+  // Synchronize subtitle track state to video element
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const v = container.querySelector("video");
+    if (!v || !v.textTracks) return;
+
+    for (let i = 0; i < v.textTracks.length; i++) {
+      const track = v.textTracks[i];
+      if (activeSubtitle === "Off") {
+        track.mode = "disabled";
+      } else if (
+        track.label?.toLowerCase() === activeSubtitle.toLowerCase() ||
+        track.language?.toLowerCase() === activeSubtitle.toLowerCase()
+      ) {
+        track.mode = "showing";
+      } else {
+        track.mode = "disabled";
+      }
+    }
+  }, [activeSubtitle, subtitles, activeStreamUrl]);
+
   // Computed lines for top-left watermark
   const { watermarkLine1, watermarkLine2 } = useMemo(() => {
     const rawAnime = (animeTitle || "Senkai Sora").trim();
@@ -690,14 +728,23 @@ export function AnimeVideoPlayer({
           setSoraAudioTracks(tracks);
           // Check saved player controls from cookies or default
           const savedControls = getPlayerControls();
-          const targetLang = savedControls.language?.toLowerCase();
-          const matched = targetLang
-            ? tracks.find(
-                (t) =>
-                  t.name.toLowerCase().includes(targetLang) ||
-                  (t.language && t.language.toLowerCase().includes(targetLang))
-              )
-            : null;
+          const targetLang = (savedControls.dub || savedControls.language)?.toLowerCase();
+          const isDubMode = savedControls.type !== "sub";
+
+          let matched = null;
+          if (isDubMode && targetLang) {
+            matched = tracks.find(
+              (t) =>
+                t.name.toLowerCase().includes(targetLang) ||
+                (t.language && t.language.toLowerCase().includes(targetLang))
+            );
+          } else if (!isDubMode) {
+            matched = tracks.find(
+              (t) =>
+                t.name.toLowerCase().includes("japan") ||
+                (t.language && t.language.toLowerCase().includes("ja"))
+            );
+          }
           const defaultTrack = matched || tracks.find((t) => t.default) || tracks[0];
           if (defaultTrack) {
             setActiveSoraAudioTrack(defaultTrack.name);
@@ -774,7 +821,13 @@ export function AnimeVideoPlayer({
   const handleSwitchSoraAudio = useCallback((trackName: string) => {
     setActiveSoraAudioTrack(trackName);
     try {
-      savePlayerControls({ language: trackName });
+      const lower = trackName.toLowerCase();
+      const isJp = lower.includes("japan") || lower.includes("original");
+      savePlayerControls({
+        language: trackName,
+        dub: isJp ? undefined : trackName,
+        type: isJp ? "sub" : "dub",
+      });
     } catch (_) {}
 
     // 1. Switch in Hls.js engine
@@ -815,6 +868,17 @@ export function AnimeVideoPlayer({
     if (!v) return;
 
     const restoreTime = () => {
+      // 1. Restore volume from cookies
+      try {
+        const savedControls = getPlayerControls();
+        const initialVol = typeof savedControls.volumeNumber === "number" ? savedControls.volumeNumber : 1;
+        v.volume = initialVol;
+        setVolume(initialVol);
+        lastSavedVolumeRef.current = initialVol;
+        if (initialVol === 0) v.muted = true;
+      } catch (_) {}
+
+      // 2. Restore playback position
       const targetTime =
         playbackTimeRestoreRef.current > 0
           ? playbackTimeRestoreRef.current
@@ -927,6 +991,26 @@ export function AnimeVideoPlayer({
       }
     };
 
+    const handleVolumeChange = () => {
+      const v = container.querySelector("video");
+      if (!v) return;
+      const currVol = v.muted ? 0 : (v.volume ?? 1);
+      setVolume(currVol);
+      setIsMuted(Boolean(v.muted));
+      if (Math.abs(currVol - lastSavedVolumeRef.current) > 0.01) {
+        lastSavedVolumeRef.current = currVol;
+        savePlayerControls({
+          vol: `${Math.round(currVol * 100)}%`,
+          volumeNumber: currVol,
+        });
+      }
+    };
+
+    const vEl = container.querySelector("video");
+    if (vEl) {
+      vEl.addEventListener("volumechange", handleVolumeChange);
+    }
+
     const interval = setInterval(syncVideo, 500);
 
     const handlePipChange = () => {
@@ -938,6 +1022,9 @@ export function AnimeVideoPlayer({
 
     return () => {
       clearInterval(interval);
+      if (vEl) {
+        vEl.removeEventListener("volumechange", handleVolumeChange);
+      }
       document.removeEventListener("enterpictureinpicture", handlePipChange);
       document.removeEventListener("leavepictureinpicture", handlePipChange);
     };
@@ -1453,6 +1540,9 @@ export function AnimeVideoPlayer({
         item.onclick = (e) => {
           e.stopPropagation();
           setActiveSubtitle(opt);
+          try {
+            savePlayerControls({ sub: opt === "Off" ? "off" : "on" });
+          } catch (_) {}
           const v = container.querySelector("video");
           if (v && v.textTracks) {
             for (let i = 0; i < v.textTracks.length; i++) {

@@ -287,11 +287,18 @@ function WatchMovieContent({ params }: PageProps) {
         setAudioLanguages(abyssLangs);
       }
 
+      const controls = getPlayerControls();
+      const preferredDub = (targetLangName || controls.dub || controls.language || "hindi").toLowerCase();
+
       const chosenTrack =
-        (targetLangName &&
-          abyssLangs.find(
-            (l: any) => l.language.toLowerCase() === targetLangName.toLowerCase()
-          )) ||
+        abyssLangs.find(
+          (l: any) => l.language.toLowerCase() === preferredDub || l.code?.toLowerCase() === preferredDub
+        ) ||
+        abyssLangs.find(
+          (l: any) =>
+            l.language.toLowerCase().includes(preferredDub) ||
+            (preferredDub.includes("hin") && (l.code === "hin" || l.language.toLowerCase().includes("hindi")))
+        ) ||
         abyssLangs.find(
           (l: any) =>
             l.code === "hin" ||
@@ -301,6 +308,12 @@ function WatchMovieContent({ params }: PageProps) {
 
       if (chosenTrack) {
         setSelectedLanguage(chosenTrack.language);
+        savePlayerControls({
+          server: normServer as any,
+          type: "dub",
+          dub: chosenTrack.language,
+          language: chosenTrack.language,
+        });
         if (chosenTrack.videoId && targetServer.serverName.toLowerCase() === "abyss") {
           setIsResolvingStream(true);
           try {
@@ -437,12 +450,21 @@ function WatchMovieContent({ params }: PageProps) {
             });
             setAudioLanguages(langs);
 
+            const savedControls = getPlayerControls();
+            const preferredDub = (savedControls.dub || savedControls.language || "hindi").toLowerCase();
             const primary =
+              langs.find((l) => l.language.toLowerCase() === preferredDub) ||
+              langs.find((l) => l.language.toLowerCase().includes(preferredDub)) ||
               langs.find((l) => l.language.toLowerCase().includes("hin")) ||
               langs[0];
 
             if (primary) {
               setSelectedLanguage(primary.language);
+              savePlayerControls({
+                dub: primary.language,
+                language: primary.language,
+                type: "dub",
+              });
               if (primary.videoId) {
                 setIsResolvingStream(true);
                 const resolved = await resolveAbyssVideo(primary.videoId);
@@ -510,7 +532,12 @@ function WatchMovieContent({ params }: PageProps) {
     directUrl?: string;
   }) => {
     setSelectedLanguage(lang.language);
-    savePlayerControls({ language: lang.language });
+    const isJp = lang.language.toLowerCase().includes("japan");
+    savePlayerControls({
+      language: lang.language,
+      dub: isJp ? undefined : lang.language,
+      type: isJp ? "sub" : "dub",
+    });
 
     if (lang.videoId && selectedServerName.toLowerCase() === "abyss") {
       setIsResolvingStream(true);
